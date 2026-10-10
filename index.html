@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Musique - Daily Music Discovery</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fbf7ee',
+                            100: '#f3e9d2',
+                            400: '#e5a852',
+                            500: '#d9822b',
+                            600: '#b85f1c',
+                            900: '#1e140d',
+                            accent: '#f43f5e',
+                            purple: '#a855f7',
+                            cyan: '#06b6d4',
+                        }
+                    },
+                    animation: {
+                        'spin-slow': 'spin 12s linear infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tone.js for Audio Synthesis & Visuals -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,800;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f17;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        .font-serif-title {
+            font-family: 'Playfair Display', serif;
+        }
+        .glass-panel {
+            background: rgba(23, 27, 38, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-panel-glow {
+            background: rgba(28, 32, 46, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(244, 63, 94, 0.2);
+            box-shadow: 0 10px 30px -10px rgba(244, 63, 94, 0.15);
+        }
+        /* Vinyl Record Animations */
+        .vinyl-spin {
+            animation: spin 8s linear infinite;
+        }
+        .vinyl-paused {
+            animation-play-state: paused;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #272d3d;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f43f5e;
+        }
+        /* Audio visualizer bar animations */
+        .v-bar {
+            transition: height 0.1s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col justify-between selection:bg-rose-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <!-- Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="loadTodaySong()">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                    <i data-lucide="disc" class="w-6 h-6 text-white animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
+                        DAILY <span class="font-serif-title italic font-normal text-rose-400">Musique</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium">Curated Sonic Discoveries</p>
+                </div>
+            </div>
+
+            <!-- Date Display & Quick Actions -->
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
+                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-rose-400"></i>
+                    <span id="currentDateDisplay">Today • Oct 10, 2026</span>
+                </div>
+                <button id="randomBtn" onclick="triggerSurpriseMe()" class="flex items-center space-x-2 px-4 py-2 rounded-full bg-slate-800/80 hover:bg-rose-500/20 hover:border-rose-500/50 border border-slate-700 text-xs font-semibold text-slate-200 hover:text-rose-300 transition-all shadow-sm">
+                    <i data-lucide="shuffle" class="w-3.5 h-3.5 text-rose-400"></i>
+                    <span>Surprise Me</span>
+                </button>
+                <button onclick="toggleFavoritesModal()" class="relative p-2.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-rose-400 transition-colors">
+                    <i data-lucide="heart" class="w-4 h-4"></i>
+                    <span id="favCountBadge" class="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-[10px] font-bold text-white rounded-full flex items-center justify-center hidden">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full space-y-10">
+
+        <!-- Featured Song Showcase Hero -->
+        <section class="relative rounded-3xl glass-panel p-6 sm:p-8 lg:p-10 overflow-hidden">
+            <!-- Background Glow Decor -->
+            <div id="ambientGlow" class="absolute -right-20 -top-20 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none transition-all duration-700"></div>
+            <div class="absolute -left-20 -bottom-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
+                
+                <!-- Vinyl Cover Art Showcase -->
+                <div class="lg:col-span-5 flex flex-col items-center justify-center">
+                    <div class="relative group cursor-pointer" onclick="togglePlayPause()">
+                        <!-- Outer Glow -->
+                        <div class="absolute inset-0 bg-gradient-to-r from-rose-500/20 to-purple-500/20 rounded-full blur-2xl group-hover:scale-105 transition-transform"></div>
+                        
+                        <!-- Album & Vinyl Deck -->
+                        <div class="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 flex items-center justify-center">
+                            <!-- Vinyl Disc (Slide out on play) -->
+                            <div id="vinylDisc" class="absolute inset-0 m-auto w-56 h-56 sm:w-64 sm:h-64 rounded-full bg-slate-950 border-4 border-slate-800 shadow-2xl flex items-center justify-center vinyl-spin vinyl-paused transition-all duration-500">
+                                <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-amber-900/40 border-2 border-slate-700/50 flex items-center justify-center relative">
+                                    <div class="w-6 h-6 rounded-full bg-slate-950 border-2 border-slate-800"></div>
+                                    <!-- Vinyl Grooves -->
+                                    <div class="absolute inset-2 rounded-full border border-white/5"></div>
+                                    <div class="absolute inset-4 rounded-full border border-white/5"></div>
+                                    <div class="absolute inset-6 rounded-full border border-white/5"></div>
+                                </div>
+                            </div>
+
+                            <!-- Album Cover Jacket -->
+                            <div class="relative w-56 h-56 sm:w-64 sm:h-64 rounded-2xl overflow-hidden shadow-2xl border border-white/10 group-hover:shadow-rose-500/20 transition-all duration-300">
+                                <img id="featuredCover" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800&auto=format&fit=crop" alt="Album Cover" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                
+                                <!-- Hover Play Overlay -->
+                                <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <div class="w-14 h-14 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                                        <i id="coverPlayIcon" data-lucide="play" class="w-6 h-6 ml-0.5"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Badge Overlay -->
+                                <div class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md border border-white/10 text-[11px] font-bold tracking-wider uppercase px-3 py-1 rounded-full text-rose-400">
+                                    <span id="featuredTag">Featured Track</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Community Rating Stars -->
+                    <div class="mt-6 flex flex-col items-center space-y-2">
+                        <div class="flex items-center space-x-1 text-amber-400" id="starRatingContainer">
+                            <!-- Star Rating populated JS -->
+                        </div>
+                        <p class="text-xs text-slate-400" id="ratingCountText">Rated 4.9/5 by 128 listeners today</p>
+                    </div>
+                </div>
+
+                <!-- Song Meta & Review Story -->
+                <div class="lg:col-span-7 flex flex-col justify-between space-y-6">
+                    <div>
+                        <!-- Header / Genre & Year -->
+                        <div class="flex flex-wrap items-center gap-2 mb-3">
+                            <span id="featuredGenre" class="px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 border border-rose-500/20 text-rose-300">Lo-Fi / Chill</span>
+                            <span id="featuredYear" class="px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400">2024</span>
+                            <span id="featuredBpm" class="px-3 py-1 rounded-full text-xs font-medium bg-slate-800/60 text-slate-400">85 BPM</span>
+                        </div>
+
+                        <!-- Title & Artist -->
+                        <h2 id="featuredTitle" class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white mb-2 font-serif-title">Midnight Echoes</h2>
+                        <h3 id="featuredArtist" class="text-lg sm:text-xl font-medium text-slate-300 mb-6 flex items-center gap-2">
+                            <span>Aura Soundscape</span>
+                            <i data-lucide="badge-check" class="w-4 h-4 text-cyan-400"></i>
+                        </h3>
+
+                        <!-- Curated Story/Review Box -->
+                        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-sm text-slate-300 leading-relaxed space-y-2">
+                            <div class="flex items-center space-x-2 text-rose-400 text-xs font-semibold uppercase tracking-wider">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                                <span>Curator's Notes & Story</span>
+                            </div>
+                            <p id="featuredStory">
+                                "Midnight Echoes blend warm analog synth pads with a crisp, dusty vinyl loop. Recorded during a quiet midnight rainstorm, this track encapsulates nostalgia and peaceful solitude. Essential listening for late-night focus or unwinding."
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Main Player Control Box -->
+                    <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-4 shadow-xl">
+                        
+                        <!-- Visualizer & Seek Scrub Bar -->
+                        <div class="space-y-2">
+                            <!-- Visualizer Bars -->
+                            <div id="visualizer" class="flex items-end justify-between h-8 gap-1 px-1">
+                                <!-- Bars inserted dynamically via JS -->
+                            </div>
+
+                            <!-- Progress Slider -->
+                            <div class="relative flex items-center">
+                                <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-rose-500 hover:accent-rose-400">
+                            </div>
+
+                            <div class="flex justify-between text-xs text-slate-400 font-mono">
+                                <span id="currentTime">0:00</span>
+                                <span id="totalDuration">2:45</span>
+                            </div>
+                        </div>
+
+                        <!-- Control Buttons Bar -->
+                        <div class="flex items-center justify-between">
+                            
+                            <!-- Left Controls: Heart & Share -->
+                            <div class="flex items-center space-x-2">
+                                <button id="favBtn" onclick="toggleFavorite()" class="p-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-500 transition-colors">
+                                    <i data-lucide="heart" id="favIcon" class="w-5 h-5"></i>
+                                </button>
+                                <button onclick="openShareModal()" class="p-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-400 transition-colors">
+                                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+
+                            <!-- Center Controls: Prev / Play / Next -->
+                            <div class="flex items-center space-x-4">
+                                <button onclick="playPrevTrack()" class="p-2 text-slate-400 hover:text-white transition-colors">
+                                    <i data-lucide="skip-back" class="w-5 h-5"></i>
+                                </button>
+                                <button id="mainPlayBtn" onclick="togglePlayPause()" class="w-12 h-12 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/25 hover:scale-105 active:scale-95 transition-all">
+                                    <i id="mainPlayIcon" data-lucide="play" class="w-6 h-6 ml-0.5"></i>
+                                </button>
+                                <button onclick="playNextTrack()" class="p-2 text-slate-400 hover:text-white transition-colors">
+                                    <i data-lucide="skip-forward" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+
+                            <!-- Right Controls: Volume -->
+                            <div class="flex items-center space-x-2">
+                                <button onclick="toggleMute()" class="text-slate-400 hover:text-white">
+                                    <i id="volumeIcon" data-lucide="volume-2" class="w-5 h-5"></i>
+                                </button>
+                                <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" class="w-16 sm:w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-rose-500">
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Mood & Genre Discovery Section -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="compass" class="w-5 h-5 text-rose-400"></i>
+                        <span>Explore Moods & Genres</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">Filter daily curation by your current state of mind</p>
+                </div>
+            </div>
+
+            <!-- Mood Buttons Pill Container -->
+            <div class="flex flex-wrap gap-2.5" id="moodFilterContainer">
+                <!-- Mood Buttons generated via JS -->
+            </div>
+        </section>
+
+        <!-- Music Calendar & Past Days Showcase -->
+        <section class="space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="calendar-days" class="w-5 h-5 text-purple-400"></i>
+                        <span>Musique Archive & Calendar</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">Revisit previous daily picks from October 2026</p>
+                </div>
+                <!-- Search input -->
+                <div class="relative w-full sm:w-64">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="archiveSearch" onkeyup="filterArchive()" placeholder="Search title or artist..." class="w-full pl-9 pr-4 py-2 rounded-full bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 transition-colors">
+                </div>
+            </div>
+
+            <!-- Grid of Days -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="archiveGrid">
+                <!-- Cards dynamically populated by JS -->
+            </div>
+        </section>
+
+        <!-- Interactive Side Grid: Trivia & Quote of the Day -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Daily Music Trivia Box -->
+            <div class="p-6 rounded-2xl glass-panel relative overflow-hidden flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center gap-1.5">
+                            <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                            <span>Daily Music Trivia</span>
+                        </span>
+                        <span class="text-xs text-slate-400" id="triviaStreak">Score: 0</span>
+                    </div>
+                    <h4 id="triviaQuestion" class="text-base font-semibold text-white">Loading trivia question...</h4>
+                    
+                    <!-- Options -->
+                    <div id="triviaOptions" class="grid grid-cols-1 gap-2 pt-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <p id="triviaFeedback" class="mt-3 text-xs font-medium text-slate-400 hidden"></p>
+            </div>
+
+            <!-- Quote of the Day Box -->
+            <div class="p-6 rounded-2xl glass-panel relative overflow-hidden flex flex-col justify-between bg-gradient-to-br from-slate-900/80 to-purple-950/30">
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2 text-purple-400 text-xs font-semibold uppercase tracking-wider">
+                        <i data-lucide="quote" class="w-4 h-4"></i>
+                        <span>Quote of the Day</span>
+                    </div>
+                    <blockquote id="dailyQuoteText" class="text-lg font-serif-title italic text-slate-200">
+                        "Music produces a kind of pleasure which human nature cannot do without."
+                    </blockquote>
+                </div>
+                <div class="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
+                    <span id="dailyQuoteAuthor" class="text-xs font-semibold text-rose-400">— Confucius</span>
+                    <button onclick="copyQuote()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy Quote
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-8 mt-12 text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="disc" class="w-4 h-4 text-rose-500"></i>
+                <span class="font-semibold text-slate-300">Daily Musique</span>
+                <span>• Handcrafted Sonic Curations</span>
+            </div>
+            <p>© 2026 Daily Musique. Synthesized audio powered by WebAudio.</p>
+        </div>
+    </footer>
+
+    <!-- Favorites Modal -->
+    <div id="favModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="heart" class="w-5 h-5 text-rose-500 fill-rose-500"></i>
+                    <span>Your Favorite Musique</span>
+                </h3>
+                <button onclick="toggleFavoritesModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="favList" class="max-h-80 overflow-y-auto space-y-2 pr-1">
+                <!-- Favorites list JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="share-2" class="w-5 h-5 text-cyan-400"></i>
+                    <span>Share Daily Track</span>
+                </h3>
+                <button onclick="closeShareModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400">Share this daily music discovery with friends or export to your favorite player.</p>
+            
+            <div class="space-y-3">
+                <button onclick="copyShareLink()" class="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors">
+                    <span class="flex items-center gap-2">
+                        <i data-lucide="link" class="w-4 h-4 text-rose-400"></i>
+                        <span>Copy Song Link</span>
+                    </span>
+                    <span id="copyLinkNotice" class="text-rose-400 text-[10px]"></span>
+                </button>
+
+                <button onclick="exportToPlaylist()" class="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors">
+                    <span class="flex items-center gap-2">
+                        <i data-lucide="download" class="w-4 h-4 text-purple-400"></i>
+                        <span>Export Playlist (.M3U)</span>
+                    </span>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-900 border border-rose-500/50 text-slate-100 text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <i data-lucide="info" class="w-4 h-4 text-rose-400"></i>
+        <span id="toastMsg">Notification message</span>
+    </div>
+
+    <script>
+        
+        // Song Database (30 Days of Curated Music)
+        const MUSIC_DATABASE = [
+            {
+                id: 10,
+                date: "Oct 10, 2026",
+                dayNum: 10,
+                title: "Midnight Echoes",
+                artist: "Aura Soundscape",
+                genre: "Chill",
+                year: 2024,
+                bpm: 85,
+                cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800&auto=format&fit=crop",
+                rating: 4.9,
+                ratingsCount: 128,
+                story: "Midnight Echoes blends warm analog synth pads with a crisp vinyl atmosphere. Recorded in Paris during a quiet midnight rain, this track captures timeless introspection.",
+                synths: { freq: "C3", type: "triangle", tempo: "8n", scale: ["C3", "E3", "G3", "B3", "D4"] }
+            },
+            {
+                id: 9,
+                date: "Oct 09, 2026",
+                dayNum: 9,
+                title: "Neon Horizon",
+                artist: "Synthwave Collective",
+                genre: "Energetic",
+                year: 2025,
+                bpm: 120,
+                cover: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=800&auto=format&fit=crop",
+                rating: 4.8,
+                ratingsCount: 94,
+                story: "A driving retro-synth track with pulsing bass lines and glowing arpeggios, inspired by sunset drives along coastal highways.",
+                synths: { freq: "E3", type: "sawtooth", tempo: "16n", scale: ["E3", "G3", "A3", "B3", "D4"] }
+            },
+            {
+                id: 8,
+                date: "Oct 08, 2026",
+                dayNum: 8,
+                title: "Velvet Rain",
+                artist: "Nora Vance Trio",
+                genre: "Groovy",
+                year: 2023,
+                bpm: 92,
+                cover: "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?q=80&w=800&auto=format&fit=crop",
+                rating: 4.7,
+                ratingsCount: 110,
+                story: "Smooth lounge beats combined with silky Rhodes keys and sub-bass grooves. Perfect accompaniment for evening coffee or focused creative work.",
+                synths: { freq: "A2", type: "sine", tempo: "8n", scale: ["A2", "C3", "E3", "G3", "C4"] }
+            },
+            {
+                id: 7,
+                date: "Oct 07, 2026",
+                dayNum: 7,
+                title: "Solitude in D-Minor",
+                artist: "Clara Schumann Ensembles",
+                genre: "Melancholic",
+                year: 2022,
+                bpm: 70,
+                cover: "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?q=80&w=800&auto=format&fit=crop",
+                rating: 4.9,
+                ratingsCount: 156,
+                story: "A delicate classical modern piece featuring solitary piano notes decaying gently into ambient reverb textures.",
+                synths: { freq: "D3", type: "sine", tempo: "4n", scale: ["D3", "F3", "A3", "C4", "D4"] }
+            },
+            {
+                id: 6,
+                date: "Oct 06, 2026",
+                dayNum: 6,
+                title: "Starlight Voyage",
+                artist: "Cosmic Odyssey",
+                genre: "Cinematic",
+                year: 2026,
+                bpm: 100,
+                cover: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop",
+                rating: 5.0,
+                ratingsCount: 204,
+                story: "An orchestral ambient masterpiece designed for sci-fi soundscapes. Swelling strings meet subtle granular synthesis.",
+                synths: { freq: "G2", type: "triangle", tempo: "2n", scale: ["G2", "D3", "G3", "B3", "D4"] }
+            },
+            {
+                id: 5,
+                date: "Oct 05, 2026",
+                dayNum: 5,
+                title: "Deep Focus Flow",
+                artist: "Brainwave Audio Labs",
+                genre: "Focus",
+                year: 2025,
+                bpm: 60,
+                cover: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=800&auto=format&fit=crop",
+                rating: 4.6,
+                ratingsCount: 88,
+                story: "Binaural alpha waves layered over soft rain sounds and minimal organ chords designed to boost deep work concentration.",
+                synths: { freq: "F3", type: "sine", tempo: "1m", scale: ["F3", "A3", "C4", "E4"] }
+            },
+            {
+                id: 4,
+                date: "Oct 04, 2026",
+                dayNum: 4,
+                title: "Tokyo Sunrise",
+                artist: "Kaito & The City Knights",
+                genre: "Groovy",
+                year: 2024,
+                bpm: 112,
+                cover: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=800&auto=format&fit=crop",
+                rating: 4.8,
+                ratingsCount: 142,
+                story: "Japanese City Pop inspired slap bass lines and upbeat synth horns celebrating the early morning light over Shinjuku.",
+                synths: { freq: "G3", type: "square", tempo: "8n", scale: ["G3", "B3", "D4", "E4"] }
+            },
+            {
+                id: 3,
+                date: "Oct 03, 2026",
+                dayNum: 3,
+                title: "Acoustic Horizon",
+                artist: "Julian Croft",
+                genre: "Chill",
+                year: 2023,
+                bpm: 80,
+                cover: "https://images.unsplash.com/photo-1445307806294-bff7f67ff225?q=80&w=800&auto=format&fit=crop",
+                rating: 4.7,
+                ratingsCount: 75,
+                story: "Warm fingerpicked acoustic guitar recorded outdoors with natural wilderness ambience soft in the background.",
+                synths: { freq: "C3", type: "triangle", tempo: "4n", scale: ["C3", "G3", "C4", "E4"] }
+            }
+        ];
+
+        // Mood Categories
+        const MOODS = ["All", "Chill", "Energetic", "Focus", "Melancholic", "Groovy", "Cinematic"];
+
+        // Trivia Data
+        const TRIVIA_QUESTIONS = [
+            {
+                q: "Which synthesizer was famous for creating iconic 80s basslines in synthwave music?",
+                options: ["Roland Juno-106", "Minimoog Model D", "Yamaha DX7", "Korg M1"],
+                correct: 1
+            },
+            {
+                q: "What tempo range (BPM) is most standard for Lo-Fi Chill Beats?",
+                options: ["120-130 BPM", "140-160 BPM", "70-90 BPM", "50-60 BPM"],
+                correct: 2
+            },
+            {
+                q: "What physical vinyl record speed is standard for LP (Long Play) albums?",
+                options: ["45 RPM", "33 1/3 RPM", "78 RPM", "16 RPM"],
+                correct: 1
+            }
+        ];
+
+        // Quotes Data
+        const QUOTES = [
+            { text: "Where words fail, music speaks.", author: "Hans Christian Andersen" },
+            { text: "Music expresses that which cannot be said and on which it is impossible to be silent.", author: "Victor Hugo" },
+            { text: "One good thing about music, when it hits you, you feel no pain.", author: "Bob Marley" },
+            { text: "Music is the shorthand of emotion.", author: "Leo Tolstoy" }
+        ];
+
+        // Global State
+        let currentSong = MUSIC_DATABASE[0];
+        let isPlaying = false;
+        let activeMood = "All";
+        let favorites = JSON.parse(localStorage.getItem('dm_favorites') || '[]');
+        let userRatings = JSON.parse(localStorage.getItem('dm_ratings') || '{}');
+        let triviaIndex = 0;
+        let triviaScore = 0;
+
+        // Tone.js Audio Synth Engine
+        let synth = null;
+        let loop = null;
+        let synthPatternIndex = 0;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initVisualizerBars();
+            renderMoodButtons();
+            renderArchiveGrid();
+            loadSong(MUSIC_DATABASE[0]);
+            updateFavBadge();
+            initTrivia();
+            initDailyQuote();
+
+            // Volume Control
+            const volSlider = document.getElementById('volumeSlider');
+            volSlider.addEventListener('input', (e) => {
+                if (Tone.Destination) {
+                    Tone.Destination.volume.value = Tone.gainToDb(parseFloat(e.target.value));
+                }
+            });
+
+            // Seek Control mock slider timer
+            setInterval(updateSeekProgress, 500);
+        });
+
+        function setupSynth() {
+            if (!synth) {
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: currentSong.synths.type },
+                    envelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 1 }
+                }).toDestination();
+                Tone.Destination.volume.value = Tone.gainToDb(0.8);
+            }
+        }
+
+        async function togglePlayPause() {
+            await Tone.start();
+            setupSynth();
+
+            isPlaying = !isPlaying;
+
+            const vinyl = document.getElementById('vinylDisc');
+            const mainIcon = document.getElementById('mainPlayIcon');
+            const coverIcon = document.getElementById('coverPlayIcon');
+            const glow = document.getElementById('ambientGlow');
+
+            if (isPlaying) {
+                // Update vinyl and icons
+                vinyl.classList.remove('vinyl-paused');
+                mainIcon.setAttribute('data-lucide', 'pause');
+                coverIcon.setAttribute('data-lucide', 'pause');
+                glow.classList.add('scale-125', 'opacity-80');
+
+                // Start Tone.js synthesized generative sequence
+                startAudioLoop();
+                showToast(`Playing "${currentSong.title}"`);
+            } else {
+                vinyl.classList.add('vinyl-paused');
+                mainIcon.setAttribute('data-lucide', 'play');
+                coverIcon.setAttribute('data-lucide', 'play');
+                glow.classList.remove('scale-125', 'opacity-80');
+
+                stopAudioLoop();
+            }
+            lucide.createIcons();
+        }
+
+        function startAudioLoop() {
+            if (loop) loop.dispose();
+
+            const scale = currentSong.synths.scale;
+            loop = new Tone.Loop((time) => {
+                const note = scale[synthPatternIndex % scale.length];
+                synth.triggerAttackRelease(note, "8n", time);
+                synthPatternIndex++;
+                
+                // Animate Visualizer Bars
+                animateVisualizer();
+            }, currentSong.synths.tempo).start(0);
+
+            Tone.Transport.start();
+        }
+
+        function stopAudioLoop() {
+            if (loop) loop.stop();
+            Tone.Transport.stop();
+            resetVisualizer();
+        }
+
+        function initVisualizerBars() {
+            const container = document.getElementById('visualizer');
+            container.innerHTML = '';
+            for (let i = 0; i < 28; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'w-1 bg-gradient-to-t from-rose-500 to-amber-400 rounded-full v-bar opacity-60';
+                bar.style.height = '15%';
+                container.appendChild(bar);
+            }
+        }
+
+        function animateVisualizer() {
+            if (!isPlaying) return;
+            const bars = document.querySelectorAll('.v-bar');
+            bars.forEach(bar => {
+                const randomHeight = Math.floor(Math.random() * 85) + 15;
+                bar.style.height = `${randomHeight}%`;
+            });
+        }
+
+        function resetVisualizer() {
+            const bars = document.querySelectorAll('.v-bar');
+            bars.forEach(bar => bar.style.height = '15%');
+        }
+
+        function loadSong(song) {
+            currentSong = song;
+
+            if (isPlaying) {
+                stopAudioLoop();
+                isPlaying = false;
+            }
+
+            document.getElementById('featuredCover').src = song.cover;
+            document.getElementById('featuredTitle').textContent = song.title;
+            document.getElementById('featuredArtist').textContent = song.artist;
+            document.getElementById('featuredGenre').textContent = song.genre;
+            document.getElementById('featuredYear').textContent = song.year;
+            document.getElementById('featuredBpm').textContent = `${song.bpm} BPM`;
+            document.getElementById('featuredStory').textContent = `"${song.story}"`;
+            document.getElementById('ratingCountText').textContent = `Rated ${song.rating}/5 by ${song.ratingsCount} listeners`;
+
+            // Reset vinyl & icons
+            document.getElementById('vinylDisc').classList.add('vinyl-paused');
+            document.getElementById('mainPlayIcon').setAttribute('data-lucide', 'play');
+            document.getElementById('coverPlayIcon').setAttribute('data-lucide', 'play');
+
+            // Render interactive star rating
+            renderStarRating(song);
+
+            // Update heart state
+            updateFavState();
+
+            lucide.createIcons();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function loadTodaySong() {
+            loadSong(MUSIC_DATABASE[0]);
+        }
+
+        function renderStarRating(song) {
+            const container = document.getElementById('starRatingContainer');
+            const userRating = userRatings[song.id] || 0;
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('i');
+                star.setAttribute('data-lucide', 'star');
+                star.className = `w-4 h-4 cursor-pointer transition-colors ${i <= (userRating || Math.floor(song.rating)) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`;
+                star.onclick = () => setRating(song.id, i);
+                container.appendChild(star);
+            }
+            lucide.createIcons();
+        }
+
+        function setRating(songId, rating) {
+            userRatings[songId] = rating;
+            localStorage.setItem('dm_ratings', JSON.stringify(userRatings));
+            renderStarRating(currentSong);
+            showToast(`You rated this track ${rating} stars!`);
+        }
+
+        function renderMoodButtons() {
+            const container = document.getElementById('moodFilterContainer');
+            container.innerHTML = '';
+
+            MOODS.forEach(mood => {
+                const btn = document.createElement('button');
+                const isActive = activeMood === mood;
+                btn.className = `px-4 py-2 rounded-full text-xs font-semibold transition-all ${
+                    isActive 
+                    ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-lg shadow-rose-500/20' 
+                    : 'bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300'
+                }`;
+                btn.textContent = mood;
+                btn.onclick = () => filterByMood(mood);
+                container.appendChild(btn);
+            });
+        }
+
+        function filterByMood(mood) {
+            activeMood = mood;
+            renderMoodButtons();
+            renderArchiveGrid();
+        }
+
+        function renderArchiveGrid() {
+            const container = document.getElementById('archiveGrid');
+            const searchVal = (document.getElementById('archiveSearch')?.value || '').toLowerCase();
+            container.innerHTML = '';
+
+            let filtered = MUSIC_DATABASE.filter(song => {
+                const matchesMood = activeMood === "All" || song.genre.toLowerCase() === activeMood.toLowerCase();
+                const matchesSearch = song.title.toLowerCase().includes(searchVal) || song.artist.toLowerCase().includes(searchVal);
+                return matchesMood && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p class="col-span-full text-center text-xs text-slate-500 py-8">No tracks found matching criteria.</p>`;
+                return;
+            }
+
+            filtered.forEach(song => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl glass-panel group hover:border-rose-500/40 cursor-pointer transition-all duration-300 flex items-center space-x-4 ${currentSong.id === song.id ? 'ring-2 ring-rose-500/50 bg-slate-900/90' : ''}`;
+                card.onclick = () => loadSong(song);
+
+                card.innerHTML = `
+                    <div class="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+                        <img src="${song.cover}" alt="${song.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform">
+                        <div class="absolute inset-0 bg-slate-950/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <i data-lucide="play" class="w-5 h-5 text-white"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                            <span>Day ${song.dayNum} • ${song.date}</span>
+                            <span class="text-rose-400 font-semibold">${song.genre}</span>
+                        </div>
+                        <h4 class="text-sm font-bold text-white truncate">${song.title}</h4>
+                        <p class="text-xs text-slate-400 truncate">${song.artist}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function filterArchive() {
+            renderArchiveGrid();
+        }
+
+        function triggerSurpriseMe() {
+            const randomIndex = Math.floor(Math.random() * MUSIC_DATABASE.length);
+            loadSong(MUSIC_DATABASE[randomIndex]);
+            showToast("Surprise track loaded!");
+        }
+
+        function toggleFavorite() {
+            const index = favorites.indexOf(currentSong.id);
+            if (index > -1) {
+                favorites.splice(index, 1);
+                showToast("Removed from Favorites");
+            } else {
+                favorites.push(currentSong.id);
+                showToast("Saved to Favorites!");
+            }
+            localStorage.setItem('dm_favorites', JSON.stringify(favorites));
+            updateFavState();
+            updateFavBadge();
+        }
+
+        function updateFavState() {
+            const favIcon = document.getElementById('favIcon');
+            const isFav = favorites.includes(currentSong.id);
+            if (isFav) {
+                favIcon.className = "w-5 h-5 text-rose-500 fill-rose-500";
+            } else {
+                favIcon.className = "w-5 h-5 text-slate-300";
+            }
+        }
+
+        function updateFavBadge() {
+            const badge = document.getElementById('favCountBadge');
+            badge.textContent = favorites.length;
+            badge.classList.toggle('hidden', favorites.length === 0);
+        }
+
+        function toggleFavoritesModal() {
+            const modal = document.getElementById('favModal');
+            const list = document.getElementById('favList');
+            modal.classList.toggle('hidden');
+
+            if (!modal.classList.contains('hidden')) {
+                list.innerHTML = '';
+                if (favorites.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No favorites added yet.</p>`;
+                    return;
+                }
+                favorites.forEach(id => {
+                    const song = MUSIC_DATABASE.find(s => s.id === id);
+                    if (song) {
+                        const item = document.createElement('div');
+                        item.className = "flex items-center justify-between p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 cursor-pointer";
+                        item.onclick = () => { loadSong(song); toggleFavoritesModal(); };
+                        item.innerHTML = `
+                            <div class="flex items-center space-x-3">
+                                <img src="${song.cover}" class="w-10 h-10 rounded-lg object-cover">
+                                <div>
+                                    <p class="text-xs font-bold text-white">${song.title}</p>
+                                    <p class="text-[10px] text-slate-400">${song.artist}</p>
+                                </div>
+                            </div>
+                            <i data-lucide="play" class="w-4 h-4 text-rose-400"></i>
+                        `;
+                        list.appendChild(item);
+                    }
+                });
+                lucide.createIcons();
+            }
+        }
+
+        function initTrivia() {
+            const item = TRIVIA_QUESTIONS[triviaIndex];
+            document.getElementById('triviaQuestion').textContent = item.q;
+            const container = document.getElementById('triviaOptions');
+            container.innerHTML = '';
+
+            item.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "text-left p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 hover:border-rose-500/50 transition-colors";
+                btn.textContent = opt;
+                btn.onclick = () => checkTrivia(idx);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkTrivia(selectedIdx) {
+            const item = TRIVIA_QUESTIONS[triviaIndex];
+            const feedback = document.getElementById('triviaFeedback');
+            feedback.classList.remove('hidden');
+
+            if (selectedIdx === item.correct) {
+                triviaScore += 100;
+                feedback.textContent = "Correct! +100 points";
+                feedback.className = "mt-3 text-xs font-medium text-emerald-400";
+            } else {
+                feedback.textContent = `Incorrect. Answer was: ${item.options[item.correct]}`;
+                feedback.className = "mt-3 text-xs font-medium text-rose-400";
+            }
+
+            document.getElementById('triviaStreak').textContent = `Score: ${triviaScore}`;
+            
+            setTimeout(() => {
+                triviaIndex = (triviaIndex + 1) % TRIVIA_QUESTIONS.length;
+                feedback.classList.add('hidden');
+                initTrivia();
+            }, 2000);
+        }
+
+        function initDailyQuote() {
+            const randomQ = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+            document.getElementById('dailyQuoteText').textContent = `"${randomQ.text}"`;
+            document.getElementById('dailyQuoteAuthor').textContent = `— ${randomQ.author}`;
+        }
+
+        function copyQuote() {
+            const q = document.getElementById('dailyQuoteText').textContent;
+            const a = document.getElementById('dailyQuoteAuthor').textContent;
+            navigator.clipboard?.writeText(`${q} ${a}`);
+            showToast("Quote copied to clipboard!");
+        }
+
+        function playNextTrack() {
+            const currentIdx = MUSIC_DATABASE.findIndex(s => s.id === currentSong.id);
+            const nextIdx = (currentIdx + 1) % MUSIC_DATABASE.length;
+            loadSong(MUSIC_DATABASE[nextIdx]);
+        }
+
+        function playPrevTrack() {
+            const currentIdx = MUSIC_DATABASE.findIndex(s => s.id === currentSong.id);
+            const prevIdx = (currentIdx - 1 + MUSIC_DATABASE.length) % MUSIC_DATABASE.length;
+            loadSong(MUSIC_DATABASE[prevIdx]);
+        }
+
+        let isMuted = false;
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (Tone.Destination) Tone.Destination.mute = isMuted;
+            const icon = document.getElementById('volumeIcon');
+            icon.setAttribute('data-lucide', isMuted ? 'volume-x' : 'volume-2');
+            lucide.createIcons();
+        }
+
+        let mockSeekTime = 0;
+        function updateSeekProgress() {
+            if (isPlaying) {
+                mockSeekTime = (mockSeekTime + 0.5) % 165;
+                const slider = document.getElementById('seekSlider');
+                slider.value = (mockSeekTime / 165) * 100;
+
+                const mins = Math.floor(mockSeekTime / 60);
+                const secs = Math.floor(mockSeekTime % 60).toString().padStart(2, '0');
+                document.getElementById('currentTime').textContent = `${mins}:${secs}`;
+            }
+        }
+
+        function openShareModal() { document.getElementById('shareModal').classList.remove('hidden'); }
+        function closeShareModal() { document.getElementById('shareModal').classList.add('hidden'); }
+
+        function copyShareLink() {
+            navigator.clipboard?.writeText(window.location.href);
+            document.getElementById('copyLinkNotice').textContent = "Copied!";
+            setTimeout(() => { document.getElementById('copyLinkNotice').textContent = ""; }, 2000);
+        }
+
+        function exportToPlaylist() {
+            const content = `#EXTM3U\n#EXTINF:165,${currentSong.artist} - ${currentSong.title}\nhttps://dailymusique.example/${currentSong.id}.mp3`;
+            const blob = new Blob([content], { type: 'audio/x-mpegurl' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `DailyMusique_${currentSong.title.replace(/\s+/g, '_')}.m3u`;
+            a.click();
+            showToast("Playlist exported!");
+            closeShareModal();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.remove('opacity-0', 'translate-y-20', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-20', 'pointer-events-none');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
